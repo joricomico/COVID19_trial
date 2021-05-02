@@ -3,7 +3,7 @@
  
 from core_legacy import struct, some, no, ni
 
-from numpy import array, average, std
+from numpy import array, average, median, std
 from numpy.random import rand, randint, seed
 
 from sklearn.ensemble import RandomForestClassifier
@@ -13,8 +13,6 @@ from sklearn.metrics import accuracy_score
 from sklearn.pipeline import Pipeline
 
 import datetime as dt
-
-_DEBUG = 0
 
 def load_data(file, seps='\t,;'):
     n_seps = len(seps)
@@ -162,8 +160,7 @@ def idsets_of(db):
     yield _set
 
 class model(struct):
-    k, err = 10, .15
-    # k, err = 6, .15
+    k, err = 10, .05
     var_mul = 4
     ideal_y = .5
     classifier=RandomForestClassifier
@@ -174,6 +171,10 @@ class model(struct):
     stack, unstacked = False, []
     _ref, from_end = 0, False
     train_on_head = False
+    err_step = .05
+    max_splits = 10
+    class tell:
+        error = True
     @staticmethod
     def score_of(x,y, margs={'n_estimators':100}):
         _model, scaler = model.classifier, model.scaler
@@ -197,7 +198,7 @@ class model(struct):
         if _.train_on_head: states = [state for state in states if state.ID]
         sort, models = int(on*len(states)), []
         miny, maxy = _.ideal_y-err, _.ideal_y+err
-        scores = []
+        scores, splits = [], 0
         while times:
             sel = set(randint(0, len(states), sort))
             A,B = [state for n,state in ni(states) if n in sel], [state for n,state in ni(states) if n not in sel]
@@ -205,7 +206,11 @@ class model(struct):
             if not _.train_on_head and DB.ids > max_ids: continue
             x,y = DB.select(**_._selargs)
             ay = average(y)
-            if not _.train_on_head and ay<miny or ay>maxy: continue
+            if splits == _.max_splits:
+                err += _.err_step
+                miny, maxy, splits = _.ideal_y-err, _.ideal_y+err, 0
+                if _.tell.error: print('error split threshold set to {:.2f}'.format(err))
+            if not _.train_on_head and ay<miny or ay>maxy: splits+=1; continue
             X,Y = array(x), array(y)
             S = _.scaler()
             Xs = S.fit_transform(X)
@@ -285,7 +290,10 @@ class model(struct):
             _to+=1
         print('from {} to {}...'.format(start, _to))
         for tag in _.stats:
-            print(tag+'\t{:.3f}'.format(average(_.stats[tag]) if len(_.stats[tag])>0 else 0))
+            print(tag+'\t{:.3f} ({:.3f})'.format(
+                average(_.stats[tag]) if len(_.stats[tag])>0 else 0, 
+                median(_.stats[tag]) if len(_.stats[tag])>0 else 0)
+                )
         DB.states = _._states
         return _to
     def calculate(stats, on=.5, by='day', targets=['bio'], outcome_from=4, model=.9, virtual=None, models=None, good=(0,'good'), bad=(1,'bad'), skip=0, threshold=.75, **opts):
@@ -324,8 +332,3 @@ class model(struct):
             print('{}\t{:.3f}'.format(var,average(i)))
     @property
     def DB(_): return _._db
-
-if _DEBUG == 1:
-    T = translation('C:/Users/omico/OneDrive/code/python/plupy/COVIData/vars.txt')
-    pclass = patient('C:/Users/omico/OneDrive/code/python/plupy/COVIData/vars.txt')
-    pclass.load('C:/Users/omico/OneDrive/code/python/plupy/COVIData/all.csv', T)
