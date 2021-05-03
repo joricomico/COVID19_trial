@@ -173,8 +173,10 @@ class model(struct):
     train_on_head = False
     err_step = .05
     max_splits = 10
-    class tell:
+    class TELL:
         error = True
+        train = True
+    tell = TELL()
     @staticmethod
     def score_of(x,y, margs={'n_estimators':100}):
         _model, scaler = model.classifier, model.scaler
@@ -222,10 +224,10 @@ class model(struct):
             Xts = S.transform(Xt)
             Yp = M.predict(Xts)
             score = accuracy_score(Yt, Yp)
-            print('{:.3f}'.format(score), end='\t')
+            if _.tell.train: print('{:.3f}'.format(score), end='\t')
             models.append((M,S)); scores.append(score)
             times -= 1
-        print('| {:.3f}'.format(average(scores)))
+        if _.tell.train: print('| {:.3f}'.format(average(scores)))
         ms = zip(models, scores)
         s_ms = sorted(ms, key=lambda x:x[1], reverse=True)
         DB.states = all_states

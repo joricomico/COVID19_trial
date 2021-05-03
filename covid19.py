@@ -4,7 +4,9 @@ import sys
 sys.path.append('..')
 
 from core import REc, struct
-from cop import load_data, translation, patient, model
+from cop import load_data, translation, patient, model, idsets_of
+
+from numpy import array, ones
 
 def make_model(by_vars, data, groups):
     T = translation(by_vars)
@@ -12,9 +14,12 @@ def make_model(by_vars, data, groups):
     pclass.load(data, T)
     return model(pclass, groups=groups)
 
+def make_db_model(by_vars, data, groups):
+    '''code to create new subjec repo'''
+
 def _calculate_models_common_init(): return []
 def _calculate_models_common_calc(hub, calc_args, tries, message, header='{} tries before saving...'):
-    print('{} tries before saving...'.format(tries))
+    print('{} tries before test is ready...'.format(tries))
     print(message.format(hub.DB.ids, hub.DB.long_ids))
     hub.calculate(**calc_args)
     hub.best = hub.unstacked
@@ -31,7 +36,7 @@ def calculate_models_from_end(hub, calc_args, message, retries):
         ir, dc = set([int(s.hn) for s in hub.in_room]), set([int(s.hn) for s in hub.dismissed])
         result(in_room=ir, discharged=dc)
         retries = _calculate_models_common_redo(hub, result, results, retries)
-    return results
+    return hub, results
 
 def calculate_models_from_start(hub, calc_args, message, retries):
     results = _calculate_models_common_init()
@@ -40,7 +45,7 @@ def calculate_models_from_start(hub, calc_args, message, retries):
         assessed = set([int(s.hn) for s in hub.assessed])
         result(assessed=assessed)
         retries = _calculate_models_common_redo(hub, result, results, retries)
-    return results    
+    return hub, results    
 
 class FOR:
     EarlyDischarge = {(0,):0, range(1,5):1}
@@ -48,7 +53,7 @@ class FOR:
     Worsening = {(0,1):0, range(2,6):1}
     MechVent = {(0,1,2):0, range(3,6):1}
 
-def test(varfile, csvdb, groups=FOR.EarlyDischarge, on=None, message='', thresh=.5, err0=.05, retry=10):
+def test(varfile, csvdb, groups=FOR.EarlyDischarge, on=None, message='', thresh=.5, err0=.05, retry=2):
     model, calcargs, compute = make_model(varfile, csvdb, groups), None, calculate_models_from_start
     if groups == FOR.EarlyDischarge:
         if on is None: on = .7
@@ -69,3 +74,24 @@ def test(varfile, csvdb, groups=FOR.EarlyDischarge, on=None, message='', thresh=
         if message == '': message = 'anticipate mechanical ventilation and ICU: {} subjects, {} in room'
         calcargs = dict(on=on, virtual=int(model.DB.long_ids/5), outcome_from=4, err=err0, threshold=thresh, skip=0)
     return compute(model, calcargs, message, retry)
+
+def train_tested(model): model.train(on=1., err=model.err)
+
+def predict(db, from_model, idlabel='hn'):
+    DB, mdb, states = db._db, from_model._db, from_model._db.states
+    prediction_of = {}
+    for idset in idsets_of(DB):
+        mdb.states, ID = idset, idset[0].get(idlabel)
+        (x,_), ym = from_model.select(**from_model._selargs), []
+        for ((M,S),_) in from_model.best:
+            try:
+                X = array(x)
+                Xs = S.transform(X)
+                Yp = M.predict(Xs)
+                ym.append(Yp)
+            except:
+                pass
+        if len(ym) == 0: ym = -ones((len(from_model.best), len(idset)))
+        prediction_of[ID] = array(ym).T
+    mdb.states = states
+    return prediction_of
