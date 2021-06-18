@@ -3,21 +3,24 @@
 import sys
 sys.path.append('..')
 
-from core import REc, struct
+from core import REc, struct, Time
 from cop import load_data, translation, patient, model, idsets_of
 
 from numpy import array, ones, average, median, std
 from scipy import stats
 
-def make_model(by_vars, data, groups):
-    '''make model for testing'''
+def make_model(by_vars, data, groups, _from=None):
+    '''make model for testing; set _from in
+    days to temporally restric the dataset.'''
     T = translation(by_vars)
     pclass = patient(by_vars)
     pclass.load(data, T)
+    states = [state for state in pclass.states if _from<=state.start] if _from else pclass.states
+    pclass.states = states
     return model(pclass, groups=groups)
 
 def make_db_model(by_vars, data, groups):
-    '''code to create new subjec repo'''
+    '''code to create new subject repo'''
 
 def _calculate_models_common_init(): return []
 def _calculate_models_common_calc(hub, calc_args, tries, message, header='{} tries before saving...'):
@@ -59,10 +62,13 @@ class FOR:
     Worsening = {(0,1):0, range(2,6):1}
     MechVent = {(0,1,2):0, range(3,6):1}
 
-def test(varfile, csvdb, groups=FOR.EarlyDischarge, on=None, message='', thresh=.5, err0=.05, retry=2):
+def test(varfile, csvdb, groups=FOR.EarlyDischarge, _from='', on=None, message='', thresh=.5, err0=.05, retry=2):
     '''creates a test model for a specific group defined by FOR, 
-    returns a model and test results, to avoid testing use retry=0.'''
-    model, calcargs, compute = make_model(varfile, csvdb, groups), None, calculate_models_from_start
+    returns a model and test results, to avoid testing use retry=0;
+    use on to override FOR recommendations for subject sampling;
+    use _from to set a temporal range for training, e.g. "March 2021".'''
+    _from = (Time.today() - Time.parse(_from, "%B %Y")).days if _from else None
+    model, calcargs, compute = make_model(varfile, csvdb, groups, _from), None, calculate_models_from_start
     if groups == FOR.EarlyDischarge:
         if on is None: on = .7
         if message == '': message = 'anticipate deterioration or recovery: {} subjects, {} in room'
