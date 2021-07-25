@@ -21,6 +21,7 @@ def make_model(by_vars, data, groups, _from=None):
 
 def make_db_model(by_vars, data, groups):
     '''code to create new subject repo'''
+    pass
 
 def _calculate_models_common_init(): return []
 def _calculate_models_common_calc(hub, calc_args, tries, message, header='{} tries before saving...'):
