@@ -14,3 +14,10 @@ In next versions:
 - a function to predict a series of new patients will be introduced;
 - selective training depending on time limits;
 - an example of graphical UI to insert data.
+
+THIS REPOSITORY will soon become OBSOLETE, a new REPOSITORY will be introduced very SOON.
+
+RAWBASE will not only provide a framework to analyze subjects' data as time series or through classical categorical machine learning analysis, but it will also introduce a NoSQL database that will facilitate text parsing and the construction of tables.
+
+Some examples from the upcoming repository:
+
